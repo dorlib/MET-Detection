@@ -1,2 +1,2 @@
-# MET-detection-transformer
+# MET-detection
 TAU final project in MET detection using transformer network
