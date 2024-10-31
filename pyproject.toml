@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "your_project_name"  # Replace with your project name
+version = "0.1.0"  # Initial version
+description = "A brief description of your project"
+authors = ["Your Name <you@example.com>"]  # Replace with your name and email
+license = "MIT"  # Specify your project's license
+readme = "README.md"  # Path to your project's README file
+
+[tool.poetry.dependencies]
+python = "^3.11"  # Specify the Python version your project supports
+numpy = "^1.24"  # Example of a dependency
+pandas = "^2.0"  # Another example of a dependency
+ruff = "^0.0.1"  # Add ruff as a dependency
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.2"  # Development dependency for testing
+black = "^23.3"  # Code formatter
+isort = "^5.10"  # Imports sorter
+
+[tool.ruff]
+line-length = 88  # Maximum line length
+exclude = ["tests/*"]  # Paths to exclude from linting
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]  # Specific error/warning codes to check
+ignore = ["E501"]  # Ignore specific error codes (like line length)
+extend-select = [
+  "UP",  # pyupgrade
+  "D",   # pydocstyle
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]  # Dependency required for building the project
+build-backend = "poetry.core.masonry.api"  # Backend to build the package
+
+[project.urls]
+"Repository" = "https://github.com/dorlib/MET-detection-transformer"  # Repository link
+
+[tool.isort]
+profile = "black"  # Use black style for sorting
+line_length = 88  # Set max line length
+known_third_party = ["numpy", "pandas"]  # Specify any known third-party packages
+default_section = "THIRDPARTY"  # Default section for third-party imports
+skip = ["tests"]  # Skip specific directories or files
+
