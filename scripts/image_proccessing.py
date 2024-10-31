@@ -1,16 +1,17 @@
+"""Provides some image processing functions."""
+
 import datetime
 import os
 
-import nibabel as nib
 import matplotlib.pyplot as plt
+import nibabel as nib
 import numpy as np
 from nibabel.dft import pydicom
-from pydicom import Dataset, FileDataset, uid
+from pydicom import FileDataset, uid
 
 
 def display_nifti(nifti_file_path):
-    """
-    Display a single NIFTI file.
+    """Display a single NIFTI file.
 
     Parameters:
     nifti_file_path (str): Path to the NIFTI file.
@@ -19,7 +20,7 @@ def display_nifti(nifti_file_path):
 
     print(f"The .nii files are stored in memory as numpy's: {type(img)}.")
 
-    plt.style.use('default')
+    plt.style.use("default")
     fig, axes = plt.subplots(4, 4, figsize=(12, 12))
     for i, ax in enumerate(axes.reshape(-1)):
         ax.imshow(img[:, :, 1 + i])
@@ -27,8 +28,7 @@ def display_nifti(nifti_file_path):
 
 
 def display_dicom(dicom_file_path):
-    """
-    Display a single DICOM file.
+    """Display a single DICOM file.
 
     Parameters:
     dicom_file_path (str): Path to the DICOM file.
@@ -37,10 +37,10 @@ def display_dicom(dicom_file_path):
     dicom_data = pydicom.dcmread(dicom_file_path)
 
     # Check if the file contains pixel data
-    if hasattr(dicom_data, 'pixel_array'):
+    if hasattr(dicom_data, "pixel_array"):
         # Display the DICOM image
-        plt.imshow(dicom_data.pixel_array, cmap='gray')
-        plt.axis('off')  # Hide axis for a cleaner image display
+        plt.imshow(dicom_data.pixel_array, cmap="gray")
+        plt.axis("off")  # Hide axis for a cleaner image display
         plt.title("DICOM Image")
         plt.show()
     else:
@@ -48,14 +48,19 @@ def display_dicom(dicom_file_path):
 
 
 def display_dicom_series(directory):
-    """
-    Display a group of DICOM files.
+    """Display a group of DICOM files.
 
     Parameters:
     directory (str): Path to the DICOM directory.
     """
     # Get all DICOM files in the directory
-    dicom_files = sorted([os.path.join(directory, f) for f in os.listdir(directory) if f.endswith('.dcm')])
+    dicom_files = sorted(
+        [
+            os.path.join(directory, f)
+            for f in os.listdir(directory)
+            if f.endswith(".dcm")
+        ]
+    )
 
     for dicom_file in dicom_files:
         dicom_data = pydicom.dcmread(dicom_file)
@@ -65,8 +70,7 @@ def display_dicom_series(directory):
 
 
 def nifti_to_dicom(nifti_path, output_path):
-    """
-    convert nifti file to DICOM
+    """Convert nifti file to DICOM.
 
     Parameters:
     nifti_path (str): Path to the nifti file
@@ -85,14 +89,12 @@ def nifti_to_dicom(nifti_path, output_path):
     file_meta.TransferSyntaxUID = uid.ImplicitVRLittleEndian
 
     # Create required DICOM metadata
-    study_date = datetime.datetime.now().strftime('%Y%m%d')
-    study_time = datetime.datetime.now().strftime('%H%M%S')
+    study_date = datetime.datetime.now().strftime("%Y%m%d")
+    study_time = datetime.datetime.now().strftime("%H%M%S")
 
     for i in range(num_slices):
         # Create a new DICOM dataset
-        dicom_file = FileDataset(
-            None, {}, file_meta=file_meta, preamble=b"\0" * 128
-        )
+        dicom_file = FileDataset(None, {}, file_meta=file_meta, preamble=b"\0" * 128)
 
         # Set necessary DICOM metadata
         dicom_file.PatientName = "Test^Firstname"
@@ -105,9 +107,10 @@ def nifti_to_dicom(nifti_path, output_path):
         dicom_file.StudyTime = study_time
         dicom_file.SliceLocation = i
         dicom_file.InstanceNumber = i + 1
-        dicom_file.PhotometricInterpretation = "MONOCHROME2"  # Required for grayscale images
+        dicom_file.PhotometricInterpretation = (
+            "MONOCHROME2"  # Required for grayscale images
+        )
         dicom_file.SamplesPerPixel = 1  # Single channel for grayscale images
-
 
         # Set pixel data and affine transformation
         slice_data = img_data[:, :, i]
@@ -127,8 +130,11 @@ def nifti_to_dicom(nifti_path, output_path):
     print(f"DICOM series saved to {output_path}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     nifti_to_dicom(
-        '../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/BraTS-MET-00418-000-t1n.nii',
-                   '../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/dicom')
-    display_dicom_series('../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/dicom')
+        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/BraTS-MET-00418-000-t1n.nii",
+        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/dicom",
+    )
+    display_dicom_series(
+        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/dicom"
+    )
