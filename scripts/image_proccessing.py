@@ -131,10 +131,5 @@ def nifti_to_dicom(nifti_path, output_path):
 
 
 if __name__ == "__main__":
-    nifti_to_dicom(
-        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/BraTS-MET-00418-000-t1n.nii",
-        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/dicom",
-    )
-    display_dicom_series(
-        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00418-000/dicom"
-    )
+    display_nifti("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00002-000/BraTS-MET-00002-000-t2f.nii")
+
