@@ -1,8 +1,10 @@
 """Provides some image processing functions."""
 
 import datetime
+import math
 import os
 
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import nibabel as nib
 import numpy as np
@@ -10,7 +12,7 @@ from nibabel.dft import pydicom
 from pydicom import FileDataset, uid
 
 
-def display_nifti(nifti_file_path):
+def display_nifti(nifti_file_path, scan_type):
     """Display a single NIFTI file.
 
     Parameters:
@@ -21,9 +23,70 @@ def display_nifti(nifti_file_path):
     print(f"The .nii files are stored in memory as numpy's: {type(img)}.")
 
     plt.style.use("default")
-    fig, axes = plt.subplots(4, 4, figsize=(12, 12))
+    fig, axes = plt.subplots(int(math.sqrt(img.shape[2])), int(math.sqrt(img.shape[2])), figsize=(12, 12))
     for i, ax in enumerate(axes.reshape(-1)):
-        ax.imshow(img[:, :, 1 + i])
+        ax.imshow(img[:, :, 1 + i], cmap="gray")
+    plt.title(scan_type)
+    plt.show()
+
+
+def apply_mask(matrix):
+    """Applying mask on given matrix.
+
+    Parameters:
+    matrix : matrix to apply mask on
+    """
+    # Find unique values in the matrix.
+    unique_values = np.unique(matrix)
+
+    # Create a dictionary where each unique value has its own mask.
+    masks = {value: (matrix == value) for value in unique_values}
+
+    # Apply each mask to isolate submatrices.
+    masked_images = {value: matrix * mask for value, mask in masks.items()}
+
+    return masked_images
+
+
+def display_nifti_with_slices(nifti_file_path, num_slices=16):
+    """Display slices of a NIFTI file in RGB using a colormap.
+
+    Parameters:
+    nifti_file_path (str): Path to the NIFTI file.
+    num_slices (int): Number of slices to display.
+    """
+    img = nib.load(nifti_file_path).get_fdata()
+    mid_slice = img.shape[2] // 2
+    slice_range = range(mid_slice - num_slices // 2, mid_slice + num_slices // 2)
+
+    print(f"The .nii files are stored in memory as numpy's: {type(img)}.")
+    print(f"Displaying slices from {mid_slice - num_slices // 2} to {mid_slice + num_slices // 2}")
+
+    plt.style.use("default")
+    fig, axes = plt.subplots(4, 4, figsize=(12, 12))
+
+    # Normalize image to range [0, 1] for RGB colormap application
+    img = (img - img.min()) / (img.max() - img.min())
+
+    for i, ax in zip(slice_range, axes.ravel()):
+        slice_data = img[:, :, i]
+        # Apply colormap and convert to RGB
+        colored_slice = cm.viridis(img[:, :, i])  # Convert to RGB using 'viridis' colormap
+        ax.imshow(colored_slice)
+        ax.set_title(f"Slice {i}")
+        ax.axis("off")
+
+        non_zero_rgb_values = colored_slice[slice_data != 0]
+        print(f"Non-zero values in slice {i}: {non_zero_rgb_values}")
+
+    masked_images = apply_mask(img[:, :, 70])
+    # Iterate over the masked images dictionary and display each masked region
+    for value, masked_image in masked_images.items():  # Use .items() to get key-value pairs
+        plt.imshow(masked_image)
+        plt.title(f"Masked Value: {value}")
+        plt.show()
+
+    plt.tight_layout()
     plt.show()
 
 
@@ -131,5 +194,10 @@ def nifti_to_dicom(nifti_path, output_path):
 
 
 if __name__ == "__main__":
-    display_nifti("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00002-000/BraTS-MET-00002-000-t2f.nii")
+    # display_nifti("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00025-000/BraTS-MET-00025-000-t1c.nii", "t1c")
+    # nifti_to_dicom("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00025-000/BraTS-MET-00025-000-t1n.nii",
+    #                "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00025-000/dicom")
+    # display_dicom_series("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/Brats-met-00025-000/dicom")
+    display_nifti_with_slices(
+        "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00025-000/BraTS-MET-00025-000-seg.nii")
 
