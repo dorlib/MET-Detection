@@ -1,5 +1,5 @@
 # MET-detection
-## TAU final project in MET detection using transformer network
+### TAU final project in MET detection using transformer network
 
 
 ## About The Project
