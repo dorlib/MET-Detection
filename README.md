@@ -14,11 +14,11 @@ Also, a user-friendly UI tool will be developed in order to allow us to analyze 
 
 
 <p align="center">
-    <img alt="Issues" src="https://img.shields.io/github/issues-raw/dorlib/IMDB-Project"/>
-    <img alt="pull request" src="https://img.shields.io/github/issues-pr-closed/dorlib/IMDB-Project"/>
-    <img alt="stars" src="https://img.shields.io/github/stars/dorlib/IMDB-Project?style=social">
-    <img alt="updated" src="https://img.shields.io/github/last-commit/dorlib/IMDB-project">
-    <img alt="size" src="https://img.shields.io/github/repo-size/dorlib/IMDB-Project" >
+    <img alt="Issues" src="https://img.shields.io/github/issues-raw/dorlib/MET-Detection"/>
+    <img alt="pull request" src="https://img.shields.io/github/issues-pr-closed/dorlib/MET-Detection"/>
+    <img alt="stars" src="https://img.shields.io/github/stars/dorlib/MET-Detection?style=social">
+    <img alt="updated" src="https://img.shields.io/github/last-commit/dorlib/MET-Detection">
+    <img alt="size" src="https://img.shields.io/github/repo-size/dorlib/MET-Detection" >
 </p>
 
 
