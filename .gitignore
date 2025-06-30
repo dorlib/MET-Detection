@@ -165,3 +165,8 @@ cython_debug/
 *.keras
 *.h5
 *.npy
+# large model & data artifacts
+*.hdf5
+*.keras
+*.h5
+*.npy
