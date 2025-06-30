@@ -120,7 +120,8 @@ def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
                 image_resized = preprocess_nifti(image, target_size=target_size)
                 images.append(image_resized)
             else:
-                print(f"Mask missing for {case_dir}, skipping this case.")
+                if with_masks:
+                    print(f"Mask missing for {case_dir}, skipping this case.")
         else:
             print(f"Skipping case {case_dir} due to missing t1c file.")
 
@@ -132,17 +133,25 @@ def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
 def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
     """Visualize a slice of the 3D image with the predicted and ground truth masks."""
     slice_idx = image.shape[2] // 2
-    plt.figure(figsize=(15, 5))
-    plt.subplot(1, 3, 1)
-    plt.title("Image")
-    plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
-    plt.subplot(1, 3, 2)
-    plt.title("Predicted Mask")
-    plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
     if ground_truth_mask is not None:
+        plt.figure(figsize=(15, 5))
+        plt.subplot(1, 3, 1)
+        plt.title("Image")
+        plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
+        plt.subplot(1, 3, 2)
+        plt.title("Predicted Mask")
+        plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
         plt.subplot(1, 3, 3)
         plt.title("Ground Truth Mask")
         plt.imshow(ground_truth_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
+    else:
+        plt.figure(figsize=(10, 5))
+        plt.subplot(1, 2, 1)
+        plt.title("Image")
+        plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
+        plt.subplot(1, 2, 2)
+        plt.title("Predicted Mask")
+        plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
     plt.show()
 
 # Main section for loading and training
@@ -210,12 +219,10 @@ if __name__ == "__main__":
         model.fit(X_train, y_train, validation_data=(X_val, y_val),
                   epochs=epochs, batch_size=batch_size, callbacks=callbacks)
 
-    # Load Validation Data
+    # Load Validation Data without masks
     print("Loading validation data...")
-    val_images, val_masks = load_nifti_data(val_dir, target_size, with_masks=True)
+    val_images = load_nifti_data(val_dir, target_size, with_masks=False)
     val_images = val_images / 255.0
-    if val_masks is not None:
-        val_masks = (val_masks > 0).astype(np.float32)
 
     # Predict and Visualize
     if len(val_images) == 0:
@@ -224,7 +231,6 @@ if __name__ == "__main__":
         for i in range(len(val_images)):
             val_image = val_images[i:i + 1]  # Single image batch for prediction
             predicted_mask = model.predict(val_image)
-            true_mask = val_masks[i] if val_masks is not None and i < len(val_masks) else None
-            visualize_segmentation(val_image[0], predicted_mask[0], true_mask)
+            visualize_segmentation(val_image[0], predicted_mask[0])  # No ground truth mask
 
     print("Process completed.")

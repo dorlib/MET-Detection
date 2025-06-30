@@ -1,0 +1,86 @@
+./MET-detection-transformer
+├── LICENSE
+├── README.md
+├── backend
+│   ├── Dockerfile
+│   ├── app
+│   │   ├── api
+│   │   │   ├── __init__.py
+│   │   │   ├── main.py
+│   │   │   └── routes.py
+│   │   ├── controllers
+│   │   │   ├── segmentation_controller.py
+│   │   │   ├── training_controller.py
+│   │   │   └── user_controller.py
+│   │   ├── db
+│   │   │   └── db.py
+│   │   ├── repositories
+│   │   │   ├── segmentation_repo.py
+│   │   │   ├── training_repo.py
+│   │   │   └── user_repo.py
+│   │   ├── services
+│   │   │   ├── __init__.py
+│   │   │   ├── segmentation_service.py
+│   │   │   ├── training_service.py
+│   │   │   └── user_service.py
+│   │   └── utils
+│   │       ├── __init__.py
+│   │       ├── image_preprocessing.py
+│   │       └── postprocessing.py
+│   ├── config
+│   │   ├── config.yaml
+│   │   ├── db_config.yaml
+│   │   └── logging.yaml
+│   ├── data
+│   │   ├── datasets.py
+│   │   ├── processed
+│   │   └── raw
+│   ├── migrations
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── losses.py
+│   │   ├── metrics.py
+│   │   ├── model_utils.py
+│   │   └── vit_segmentation.py
+│   ├── requirments.txt
+│   ├── scripts
+│   │   ├── evaluate.py
+│   │   ├── inference.py
+│   │   └── train.py
+│   └── tests
+│       ├── test_api.py
+│       ├── test_models.py
+│       ├── test_services.py
+│       └── test_utils.py
+├── client
+│   ├── Dockerfile
+│   ├── README.md
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── public
+│   │   ├── favicon.ico
+│   │   ├── index.html
+│   │   ├── logo192.png
+│   │   ├── logo512.png
+│   │   ├── manifest.json
+│   │   └── robots.txt
+│   └── src
+│       ├── App.css
+│       ├── App.js
+│       ├── App.test.js
+│       ├── assets
+│       ├── components
+│       ├── index.css
+│       ├── index.js
+│       ├── logo.svg
+│       ├── pages
+│       ├── reportWebVitals.js
+│       ├── services
+│       │   └── api.py
+│       └── setupTests.js
+├── docker-compose.yaml
+├── pyproject.toml
+└── scripts
+    └── image_proccessing.py
+
+25 directories, 59 files

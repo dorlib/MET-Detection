@@ -1,0 +1,27 @@
+# pack-refs with: peeled fully-peeled sorted 
+daa32e916c631cb5819bac427fca9b0b43536455 refs/heads/dor/scripts/add-image-proccessing-functionallity
+017649ba010cce1dbd6e656f0a21173de38e24ce refs/heads/dor/stacture/define-initial-stracture
+42e7dd9c33e1c974104489611e2dde6c0e0b63e6 refs/heads/dorlib-patch-1
+74d72d5aa7bc2cc6849e37edfc08952a86d0668e refs/heads/dorlib-patch-2
+4c24773ceab4a1dd15b2189ea505d74fbc4774c7 refs/heads/dorlib-patch-3
+7b2325930c662e6ffca35779ad3116fd29d162fb refs/heads/dorlib-patch-4
+078d2518c7996efadc261f3947209a9a2de38ca0 refs/heads/dorlib-patch-5
+2b5d299dca633b1e75a78a81ad5be70aceede79f refs/heads/dorlib-patch-6
+15f1a34cdf85b4fac6e46f9c8e84a953d5c6b7b2 refs/heads/gshachar12-patch-1
+3b07842ab6e3c51226c49999d35e7d15752df333 refs/heads/gshachar12-patch-2
+6217a4c33ef9a316b99d978b78c94608c03f69f5 refs/heads/main
+369b25face560171d9b370ba2b8804028c3875c0 refs/pull/1/head
+4e4948080300827c753c337ccb912489048be676 refs/pull/10/head
+53c283876d919083fa2264d9c6b1dcc78045027c refs/pull/11/head
+017649ba010cce1dbd6e656f0a21173de38e24ce refs/pull/12/head
+2b5d299dca633b1e75a78a81ad5be70aceede79f refs/pull/13/head
+3b07842ab6e3c51226c49999d35e7d15752df333 refs/pull/14/head
+771a03a98a3f9d7b82395c13054155bddc649b37 refs/pull/14/merge
+42f45bc7e69aed6302a3e7fa80eac58274219ce8 refs/pull/2/head
+5d65e2cc66d5404a2423ae6d5c1c6a45f3cee314 refs/pull/3/head
+daa32e916c631cb5819bac427fca9b0b43536455 refs/pull/4/head
+bdfedf107b40f92de4991d64cb1de39ca7f660df refs/pull/5/head
+42e7dd9c33e1c974104489611e2dde6c0e0b63e6 refs/pull/6/head
+74d72d5aa7bc2cc6849e37edfc08952a86d0668e refs/pull/7/head
+4c24773ceab4a1dd15b2189ea505d74fbc4774c7 refs/pull/8/head
+7b2325930c662e6ffca35779ad3116fd29d162fb refs/pull/9/head
