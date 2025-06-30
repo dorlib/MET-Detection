@@ -361,5 +361,5 @@ if __name__ == "__main__":
     # display_nifti_with_slices(
     #     "../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00025-000/BraTS-MET-00025-000-seg.nii")
     # display_nifti_with_slices_for_mask("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/BraTS-MET-00025-000/BraTS-MET-00025-000-seg.nii")
-    # process_folders("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData")
-    display_nifti("../../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/Brats-met-00025-000/masks/mask_value_1.0.nii", "cdscd")
+    # process_folders("../../MET-data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData_Additional")
+    # display_nifti("../../MET-data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData/Brats-met-00025-000/masks/mask_value_1.0.nii", "cdscd")

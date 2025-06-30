@@ -10,9 +10,10 @@ from tensorflow.keras.layers import (
     Input, Conv3D, MaxPooling3D, Conv3DTranspose, concatenate, BatchNormalization
 )
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import backend as K  # Import Keras backend for custom loss functions
 from tensorflow.keras.losses import binary_crossentropy  # Import binary cross-entropy loss
+from tensorflow.keras.saving import register_keras_serializable
 
 # Function to load and normalize NIfTI images
 def load_nifti(file_path):
@@ -57,44 +58,56 @@ def build_3d_unet(input_shape=(128, 128, 64, 1)):
         return x
 
     inputs = Input(shape=input_shape)
-    conv1 = conv_block(inputs, 32)
+    conv1 = conv_block(inputs, 128)  # Increase filters for better feature extraction
     pool1 = MaxPooling3D(pool_size=(2, 2, 2))(conv1)
 
-    conv2 = conv_block(pool1, 64)
+    conv2 = conv_block(pool1, 256)
     pool2 = MaxPooling3D(pool_size=(2, 2, 2))(conv2)
 
-    conv3 = conv_block(pool2, 128)
+    conv3 = conv_block(pool2, 512)
     pool3 = MaxPooling3D(pool_size=(2, 2, 2))(conv3)
 
-    conv4 = conv_block(pool3, 256)
-    up5 = Conv3DTranspose(128, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv4)
+    conv4 = conv_block(pool3, 1024)  # Increased depth
+    up5 = Conv3DTranspose(512, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv4)
     merge5 = concatenate([up5, conv3], axis=4)
 
-    conv5 = conv_block(merge5, 128)
-    up6 = Conv3DTranspose(64, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv5)
+    conv5 = conv_block(merge5, 512)
+    up6 = Conv3DTranspose(256, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv5)
     merge6 = concatenate([up6, conv2], axis=4)
 
-    conv6 = conv_block(merge6, 64)
-    up7 = Conv3DTranspose(32, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv6)
+    conv6 = conv_block(merge6, 256)
+    up7 = Conv3DTranspose(128, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv6)
     merge7 = concatenate([up7, conv1], axis=4)
 
-    conv7 = conv_block(merge7, 32)
+    conv7 = conv_block(merge7, 128)
     outputs = Conv3D(1, (1, 1, 1), activation='sigmoid')(conv7)
     return Model(inputs, outputs)
 
-# Custom dice coefficient and dice loss functions
+# Custom focal loss, dice coefficient, and dice loss functions
+@register_keras_serializable()
+def focal_loss(y_true, y_pred, alpha=0.25, gamma=2.0):
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    cross_entropy = -y_true_f * K.log(y_pred_f + K.epsilon()) - (1 - y_true_f) * K.log(1 - y_pred_f + K.epsilon())
+    weight = alpha * y_true_f * K.pow(1 - y_pred_f, gamma) + (1 - alpha) * (1 - y_true_f) * K.pow(y_pred_f, gamma)
+    return K.mean(weight * cross_entropy)
+
+@register_keras_serializable()
 def dice_coefficient(y_true, y_pred, smooth=1e-6):
     y_true_f = K.flatten(y_true)
     y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
+@register_keras_serializable()
 def dice_loss(y_true, y_pred):
     return 1 - dice_coefficient(y_true, y_pred)
 
-# Combined loss function: Dice Loss + Binary Cross-Entropy Loss
-def combined_loss(y_true, y_pred):
-    return binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
+# Combined loss function: Focal Loss + Dice Loss
+@register_keras_serializable('combined_loss')
+@register_keras_serializable()
+def combined_focal_dice_loss(y_true, y_pred):
+    return 2 * focal_loss(y_true, y_pred) + dice_loss(y_true, y_pred)
 
 # Load NIfTI data
 def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
@@ -132,6 +145,7 @@ def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
 # Visualization function
 def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
     """Visualize a slice of the 3D image with the predicted and ground truth masks."""
+    thresholded_mask = (predicted_mask > 0.5).astype(np.float32)  # Apply thresholding
     slice_idx = image.shape[2] // 2
     if ground_truth_mask is not None:
         plt.figure(figsize=(15, 5))
@@ -140,7 +154,7 @@ def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
         plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
         plt.subplot(1, 3, 2)
         plt.title("Predicted Mask")
-        plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
+        plt.imshow(thresholded_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
         plt.subplot(1, 3, 3)
         plt.title("Ground Truth Mask")
         plt.imshow(ground_truth_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
@@ -151,7 +165,7 @@ def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
         plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
         plt.subplot(1, 2, 2)
         plt.title("Predicted Mask")
-        plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
+        plt.imshow(thresholded_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
     plt.show()
 
 # Main section for loading and training
@@ -164,8 +178,8 @@ if __name__ == "__main__":
     # Parameters
     target_size = (128, 128, 64)
     batch_size = 2
-    epochs = 30  # Increased epochs for more training
-    learning_rate = 1e-4
+    epochs = 50  # Increased epochs for more training
+    learning_rate = 1e-3  # Start with a higher learning rate
 
     # Load Training Data
     print("Loading training data...")
@@ -182,21 +196,6 @@ if __name__ == "__main__":
     # Binarize masks
     train_masks = (train_masks > 0).astype(np.float32)
 
-    # Visualize some training data
-    print("Visualizing sample training data...")
-    for idx in range(3):  # Visualize first 3 samples
-        image = train_images[idx]
-        mask = train_masks[idx]
-        slice_idx = image.shape[2] // 2
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
-        plt.title("Image Slice")
-        plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
-        plt.subplot(1, 2, 2)
-        plt.title("Mask Slice")
-        plt.imshow(mask[:, :, slice_idx, 0], cmap='gray')
-        plt.show()
-
     # Split Training Data for Validation
     X_train, X_val, y_train, y_val = train_test_split(train_images, train_masks, test_size=0.2, random_state=42)
 
@@ -206,15 +205,17 @@ if __name__ == "__main__":
         model = load_model(model_path, custom_objects={
             'dice_loss': dice_loss,
             'dice_coefficient': dice_coefficient,
-            'combined_loss': combined_loss
+            'combined_focal_dice_loss': combined_focal_dice_loss,
+            'combined_loss': combined_focal_dice_loss
         })
     else:
         print("Training a new model...")
         model = build_3d_unet(input_shape=(128, 128, 64, 1))
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=combined_loss, metrics=[dice_coefficient])
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=combined_focal_dice_loss, metrics=[dice_coefficient])
         callbacks = [
             EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
-            ModelCheckpoint(model_path, save_best_only=True)
+            ModelCheckpoint(model_path, save_best_only=True),
+            ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6)
         ]
         model.fit(X_train, y_train, validation_data=(X_val, y_val),
                   epochs=epochs, batch_size=batch_size, callbacks=callbacks)

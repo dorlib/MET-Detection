@@ -7,12 +7,16 @@ from sklearn.model_selection import train_test_split
 import tensorflow as tf
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import (
-    Input, Conv3D, MaxPooling3D, Conv3DTranspose, concatenate, BatchNormalization
+    Input, Dense, LayerNormalization, MultiHeadAttention, Dropout, Conv3D, Conv3DTranspose, concatenate, Reshape, Flatten
 )
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from tensorflow.keras import backend as K  # Import Keras backend for custom loss functions
 from tensorflow.keras.losses import binary_crossentropy  # Import binary cross-entropy loss
+from tensorflow.keras.saving import register_keras_serializable
+
+# Enable mixed precision training for better memory utilization
+tf.keras.mixed_precision.set_global_policy('mixed_float16')
 
 # Function to load and normalize NIfTI images
 def load_nifti(file_path):
@@ -22,7 +26,7 @@ def load_nifti(file_path):
     image = np.clip(image, 0, 255)  # Normalize intensity values to [0, 255]
     return image
 
-def preprocess_nifti(image, mask=None, target_size=(128, 128, 64)):
+def preprocess_nifti(image, mask=None, target_size=(32, 32, 16)):
     """Resize 3D NIfTI images and masks to a target size."""
     def resize_volume(volume, target_size):
         # Rescale each slice in the z-axis
@@ -47,58 +51,87 @@ def preprocess_nifti(image, mask=None, target_size=(128, 128, 64)):
 
     return image_resized
 
-# Function to build a 3D U-Net model
-def build_3d_unet(input_shape=(128, 128, 64, 1)):
-    def conv_block(inputs, filters):
-        x = Conv3D(filters, (3, 3, 3), activation='relu', padding='same')(inputs)
-        x = BatchNormalization()(x)
-        x = Conv3D(filters, (3, 3, 3), activation='relu', padding='same')(x)
-        x = BatchNormalization()(x)
+# Function to build a Transformer-based encoder-decoder model
+def build_transformer_model(input_shape=(32, 32, 16, 1)):
+    inputs = Input(shape=input_shape)
+
+    # Initial Convolution
+    x = Conv3D(32, (3, 3, 3), activation='relu', padding='same')(inputs)
+    x = LayerNormalization(epsilon=1e-6)(x)
+
+    # Transformer Encoder
+    def transformer_encoder(x, num_heads=1, key_dim=8, ff_dim=32, dropout_rate=0.1):
+        # Flatten the input for Multi-Head Attention
+        x_flat = Reshape((-1, x.shape[-1]))(x)
+        # Multi-Head Attention Layer
+        attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=key_dim)(x_flat, x_flat)
+        attn_output = Dropout(dropout_rate)(attn_output)
+        x_flat = LayerNormalization(epsilon=1e-6)(x_flat + attn_output)
+
+        # Feed Forward Network
+        ffn_output = Dense(ff_dim, activation='relu')(x_flat)
+        ffn_output = Dense(x_flat.shape[-1])(ffn_output)
+        ffn_output = Dropout(dropout_rate)(ffn_output)
+        x_flat = LayerNormalization(epsilon=1e-6)(x_flat + ffn_output)
+        x = Reshape((x.shape[1], x.shape[2], x.shape[3], x.shape[-1]))(x_flat)  # Reshape back to original shape
         return x
 
-    inputs = Input(shape=input_shape)
-    conv1 = conv_block(inputs, 32)
-    pool1 = MaxPooling3D(pool_size=(2, 2, 2))(conv1)
+    # Apply the transformer encoder
+    x = transformer_encoder(x, num_heads=1, key_dim=8, ff_dim=32, dropout_rate=0.1)
 
-    conv2 = conv_block(pool1, 64)
-    pool2 = MaxPooling3D(pool_size=(2, 2, 2))(conv2)
+    # Transformer Decoder
+    def transformer_decoder(x, encoder_output, num_heads=1, key_dim=8, ff_dim=32, dropout_rate=0.1):
+        # Flatten the input for Multi-Head Attention
+        x_flat = Reshape((-1, x.shape[-1]))(x)
+        encoder_flat = Reshape((-1, encoder_output.shape[-1]))(encoder_output)
+        # Multi-Head Attention Layer with Encoder Output as Key and Value
+        attn_output = MultiHeadAttention(num_heads=num_heads, key_dim=key_dim)(x_flat, encoder_flat)
+        attn_output = Dropout(dropout_rate)(attn_output)
+        x_flat = LayerNormalization(epsilon=1e-6)(x_flat + attn_output)
 
-    conv3 = conv_block(pool2, 128)
-    pool3 = MaxPooling3D(pool_size=(2, 2, 2))(conv3)
+        # Feed Forward Network
+        ffn_output = Dense(ff_dim, activation='relu')(x_flat)
+        ffn_output = Dense(x_flat.shape[-1])(ffn_output)
+        ffn_output = Dropout(dropout_rate)(ffn_output)
+        x_flat = LayerNormalization(epsilon=1e-6)(x_flat + ffn_output)
+        x = Reshape((x.shape[1], x.shape[2], x.shape[3], x.shape[-1]))(x_flat)  # Reshape back to original shape
+        return x
 
-    conv4 = conv_block(pool3, 256)
-    up5 = Conv3DTranspose(128, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv4)
-    merge5 = concatenate([up5, conv3], axis=4)
+    # Apply the transformer decoder
+    x = transformer_decoder(x, x, num_heads=1, key_dim=8, ff_dim=32, dropout_rate=0.1)
 
-    conv5 = conv_block(merge5, 128)
-    up6 = Conv3DTranspose(64, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv5)
-    merge6 = concatenate([up6, conv2], axis=4)
+    # Final Convolution to produce output mask
+    outputs = Conv3D(1, (1, 1, 1), activation='sigmoid', dtype='float32')(x)
 
-    conv6 = conv_block(merge6, 64)
-    up7 = Conv3DTranspose(32, (2, 2, 2), strides=(2, 2, 2), padding='same')(conv6)
-    merge7 = concatenate([up7, conv1], axis=4)
-
-    conv7 = conv_block(merge7, 32)
-    outputs = Conv3D(1, (1, 1, 1), activation='sigmoid')(conv7)
     return Model(inputs, outputs)
 
-# Custom dice coefficient and dice loss functions
-def dice_coefficient(y_true, y_pred, smooth=1e-6):
+# Custom IoU coefficient and IoU loss functions
+@register_keras_serializable()
+def iou_coefficient(y_true, y_pred, smooth=1e-6):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
     y_true_f = K.flatten(y_true)
     y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
-    return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    union = K.sum(y_true_f) + K.sum(y_pred_f) - intersection
+    return (intersection + smooth) / (union + smooth)
 
-def dice_loss(y_true, y_pred):
-    return 1 - dice_coefficient(y_true, y_pred)
+@register_keras_serializable()
+def iou_loss(y_true, y_pred):
+    return 1 - iou_coefficient(y_true, y_pred)
 
-# Combined loss function: Dice Loss + Binary Cross-Entropy Loss
-def combined_loss(y_true, y_pred):
-    return binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
+# Updated Combined Loss Function (IoU + Dice + BCE)
+@register_keras_serializable()
+def combined_iou_dice_bce_loss(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    iou = 1 - iou_coefficient(y_true, y_pred)
+    dice = 1 - iou_coefficient(y_true, y_pred)
+    return iou + dice + binary_crossentropy(y_true, y_pred)
 
 # Load NIfTI data
-def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
-    """Load NIfTI images (t1c) and segmentation masks (seg) from the dataset."""
+def load_nifti_data(root_dir, target_size=(32, 32, 16), with_masks=True):
+    """Load NIfTI images (t1c) and segmentation masks (ET label) from the dataset."""
     images = []
     masks = [] if with_masks else None
 
@@ -107,18 +140,19 @@ def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
         if not os.path.isdir(case_path):
             continue
         t1c_path = os.path.join(case_path, f"{case_dir}-t1c.nii.gz")
-        seg_path = f"{case_path}/masks/mask_value_2.0.nii" if with_masks else None
+        seg_path = f"{case_path}/masks/mask_value_3.0.nii" if with_masks else None
 
         if os.path.exists(t1c_path):
-            image = load_nifti(t1c_path)
+            t1c_image = load_nifti(t1c_path)
+            t1c_image_resized = preprocess_nifti(t1c_image, target_size=target_size)
+
             if with_masks and os.path.exists(seg_path):
                 mask = load_nifti(seg_path)
-                image_resized, mask_resized = preprocess_nifti(image, mask, target_size=target_size)
-                images.append(image_resized)
+                _, mask_resized = preprocess_nifti(t1c_image, mask, target_size=target_size)
+                images.append(t1c_image_resized)
                 masks.append(mask_resized)
             elif not with_masks:
-                image_resized = preprocess_nifti(image, target_size=target_size)
-                images.append(image_resized)
+                images.append(t1c_image_resized)
             else:
                 if with_masks:
                     print(f"Mask missing for {case_dir}, skipping this case.")
@@ -132,6 +166,7 @@ def load_nifti_data(root_dir, target_size=(128, 128, 64), with_masks=True):
 # Visualization function
 def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
     """Visualize a slice of the 3D image with the predicted and ground truth masks."""
+    thresholded_mask = (predicted_mask > 0.5).astype(np.float32)  # Apply thresholding
     slice_idx = image.shape[2] // 2
     if ground_truth_mask is not None:
         plt.figure(figsize=(15, 5))
@@ -140,7 +175,7 @@ def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
         plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
         plt.subplot(1, 3, 2)
         plt.title("Predicted Mask")
-        plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
+        plt.imshow(thresholded_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
         plt.subplot(1, 3, 3)
         plt.title("Ground Truth Mask")
         plt.imshow(ground_truth_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
@@ -151,7 +186,7 @@ def visualize_segmentation(image, predicted_mask, ground_truth_mask=None):
         plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
         plt.subplot(1, 2, 2)
         plt.title("Predicted Mask")
-        plt.imshow(predicted_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
+        plt.imshow(thresholded_mask[:, :, slice_idx, 0], cmap='hot', alpha=0.7)
     plt.show()
 
 # Main section for loading and training
@@ -159,19 +194,18 @@ if __name__ == "__main__":
     # Paths
     train_dir = "../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-TrainingData"
     val_dir = "../MET - data/ASNR-MICCAI-BraTS2023-MET-Challenge-ValidationData"
-    model_path = "unet_3d_model-t1c-mask-value-2-combined.keras"
+    model_path = "unet_3d_model-t1c-transformer.keras"
 
     # Parameters
-    target_size = (128, 128, 64)
+    target_size = (32, 32, 16)
     batch_size = 2
-    epochs = 30  # Increased epochs for more training
-    learning_rate = 1e-4
+    epochs = 50
+    learning_rate = 1e-5  # Reduced learning rate for better convergence
 
     # Load Training Data
     print("Loading training data...")
     train_images, train_masks = load_nifti_data(train_dir, target_size)
 
-    # If no valid training data (image-mask pairs), exit early
     if len(train_images) == 0 or len(train_masks) == 0:
         print("No valid training data found, exiting.")
         exit()
@@ -182,21 +216,6 @@ if __name__ == "__main__":
     # Binarize masks
     train_masks = (train_masks > 0).astype(np.float32)
 
-    # Visualize some training data
-    print("Visualizing sample training data...")
-    for idx in range(3):  # Visualize first 3 samples
-        image = train_images[idx]
-        mask = train_masks[idx]
-        slice_idx = image.shape[2] // 2
-        plt.figure(figsize=(10, 5))
-        plt.subplot(1, 2, 1)
-        plt.title("Image Slice")
-        plt.imshow(image[:, :, slice_idx, 0], cmap='gray')
-        plt.subplot(1, 2, 2)
-        plt.title("Mask Slice")
-        plt.imshow(mask[:, :, slice_idx, 0], cmap='gray')
-        plt.show()
-
     # Split Training Data for Validation
     X_train, X_val, y_train, y_val = train_test_split(train_images, train_masks, test_size=0.2, random_state=42)
 
@@ -204,17 +223,18 @@ if __name__ == "__main__":
     if os.path.exists(model_path):
         print(f"Loading saved model from {model_path}...")
         model = load_model(model_path, custom_objects={
-            'dice_loss': dice_loss,
-            'dice_coefficient': dice_coefficient,
-            'combined_loss': combined_loss
+            'iou_loss': iou_loss,
+            'iou_coefficient': iou_coefficient,
+            'combined_iou_dice_bce_loss': combined_iou_dice_bce_loss
         })
     else:
         print("Training a new model...")
-        model = build_3d_unet(input_shape=(128, 128, 64, 1))
-        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=combined_loss, metrics=[dice_coefficient])
+        model = build_transformer_model(input_shape=(32, 32, 16, 1))
+        model.compile(optimizer=Adam(learning_rate=learning_rate), loss=combined_iou_dice_bce_loss, metrics=[iou_coefficient])
         callbacks = [
             EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
-            ModelCheckpoint(model_path, save_best_only=True)
+            ModelCheckpoint(model_path, save_best_only=True),
+            ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6)
         ]
         model.fit(X_train, y_train, validation_data=(X_val, y_val),
                   epochs=epochs, batch_size=batch_size, callbacks=callbacks)
